@@ -1,7 +1,22 @@
-__pycache__/
-*.pt
-*.pth
-*.ckpt
-data/
-logs/
+# Environments
+venv/
 .env
+
+# Data and Artifacts
+data/
+models/
+mlruns/
+*.db
+
+# Python Caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS generated files
+.DS_Store
+Thumbs.db

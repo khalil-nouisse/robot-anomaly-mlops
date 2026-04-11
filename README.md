@@ -101,18 +101,26 @@ Project Structure
 
 roboguard-ai/
 │
-├── data/               # Raw & processed datasets
-├── models/             # Saved models
-├── src/
-│   ├── preprocessing/  # Data cleaning & windowing
-│   ├── models/         # LSTM Autoencoder
-│   ├── training/       # Training scripts
-│   ├── inference/      # Detection logic
+├── .github/workflows/  # CI/CD pipelines (GitHub Actions for linting/testing)
+├── configs/            # YAML files (Hyperparameters, DB connections, API settings)
+├── data/               # Raw & processed datasets (Must be in .gitignore!)
+├── docker/             # Dockerfiles (e.g., Dockerfile.api, Dockerfile.train)
+├── models/             # Local model artifacts (weights, scalers) before MLflow
 │
-├── notebooks/          # Experiments & EDA
-├── api/                # (Optional) FastAPI service
-├── requirements.txt
-├── README.md
+├── src/
+│   ├── data/           # Data ingestion & validation scripts
+│   ├── features/       # Preprocessing & time-series windowing
+│   ├── models/         # Deep Learning architectures (PyTorch)
+│   ├── training/       # Training loops & MLflow tracking integration
+│   └── inference/      # Detection logic & anomaly scoring
+│
+├── api/                # FastAPI service (Mandatory for serving!)
+├── tests/              # Unit tests for preprocessing logic and API endpoints
+├── notebooks/          # Experiments & EDA (Strictly scratchpads)
+│
+├── .gitignore          # Crucial for ignoring the 1.1GB dataset and __pycache__
+├── requirements.txt    # Or pyproject.toml (if using Poetry)
+└── README.md
 
 
 ⸻

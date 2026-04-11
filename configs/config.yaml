@@ -1,0 +1,16 @@
+data:
+  raw_path: "data/voraus-ad-dataset-100hz.parquet"
+  processed_dir: "data/processed"
+
+model:
+  models_dir: "models"
+  fixed_length: 250
+
+model_params:
+  n_features: 130   # 137 total - 7 ignored = 130
+  hidden_dim: 64    # How much we compress the data (the bottleneck)
+  n_layers: 2       # Number of LSTM layers
+  dropout: 0.2
+  learning_rate: 0.001
+  batch_size: 32
+  epochs: 50
