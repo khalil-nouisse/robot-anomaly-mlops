@@ -1,0 +1,101 @@
+import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader, TensorDataset
+import numpy as np
+import yaml
+import logging
+from pathlib import Path
+from sklearn.metrics import roc_auc_score, classification_report
+
+from src.models.autoencoder import LSTMAutoencoder
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+def load_config(config_path: str = "configs/config.yaml") -> dict:
+    with open(config_path, "r") as file:
+        return yaml.safe_load(file)
+
+def get_device():
+    if torch.cuda.is_available(): return torch.device("cuda")
+    elif torch.backends.mps.is_available(): return torch.device("mps")
+    return torch.device("cpu")
+
+def calculate_reconstruction_errors(model, dataloader, device):
+    """Runs data through the model and calculates the error for EACH individual sequence."""
+    model.eval()
+    errors = []
+    
+    # We use reduction='none' because we want the error per sequence, not the average of the batch
+    criterion = nn.MSELoss(reduction='none') 
+    
+    with torch.no_grad():
+        for batch in dataloader:
+            batch_data = batch[0].to(device)
+            reconstruction = model(batch_data)
+            
+            # 1. Calculate raw pixel-by-pixel error: Shape (batch_size, seq_len, features)
+            loss = criterion(reconstruction, batch_data)
+            
+            # 2. Average the error across the time steps and features to get ONE score per sequence
+            seq_errors = loss.mean(dim=[1, 2]).cpu().numpy() 
+            errors.extend(seq_errors)
+            
+    return np.array(errors)
+
+def run_inference():
+    config = load_config()
+    params = config['model_params']
+    device = get_device()
+    
+    PROCESSED_DIR = Path(config['data']['processed_dir'])
+    MODEL_PATH = Path(config['model']['models_dir']) / "lstm_autoencoder.pth"
+    
+    # 1. Load the Trained Model
+    logging.info("Loading trained model architecture and weights...")
+    model = LSTMAutoencoder(
+        n_features=params['n_features'],
+        hidden_dim=params['hidden_dim'],
+        n_layers=params['n_layers']
+    ).to(device)
+    
+    # Inject the learned brain (the .pth file) into the architecture
+    model.load_state_dict(torch.load(MODEL_PATH, map_location=device, weights_only=True))
+    
+    # 2. Load the Data
+    logging.info("Loading validation (normal) and test (anomaly) tensors...")
+    X_val = torch.load(PROCESSED_DIR / "X_val.pt")
+    X_anomaly = torch.load(PROCESSED_DIR / "X_anomaly.pt")
+    
+    val_loader = DataLoader(TensorDataset(X_val), batch_size=params['batch_size'], shuffle=False)
+    anomaly_loader = DataLoader(TensorDataset(X_anomaly), batch_size=params['batch_size'], shuffle=False)
+
+    # 3. Calculate Errors
+    logging.info("Calculating reconstruction errors for Normal data...")
+    val_errors = calculate_reconstruction_errors(model, val_loader, device)
+    
+    logging.info("Calculating reconstruction errors for Anomaly data...")
+    anomaly_errors = calculate_reconstruction_errors(model, anomaly_loader, device)
+
+    # 4. Define the Threshold (95th percentile of normal data)
+    threshold = np.percentile(val_errors, 95)
+    logging.info(f"--- DYNAMIC THRESHOLD SET AT: {threshold:.5f} ---")
+
+    # 5. Evaluate the Results
+    # True labels: Normal = 0, Anomaly = 1
+    y_true = np.concatenate([np.zeros(len(val_errors)), np.ones(len(anomaly_errors))])
+    
+    # Predicted scores (the raw error values)
+    y_scores = np.concatenate([val_errors, anomaly_errors])
+    
+    # Predicted classes based on our threshold , if y_scores > threshold => "True" else "False"
+    y_pred = (y_scores > threshold).astype(int)
+
+    # 6. Print the Final Report
+    logging.info("\n" + classification_report(y_true, y_pred, target_names=["Normal", "Anomaly"]))
+    
+    # AUROC is the standard metric for anomaly detection (1.0 is perfect, 0.5 is random guessing)
+    auroc = roc_auc_score(y_true, y_scores)
+    logging.info(f"Final AUROC Score: {auroc:.4f}")
+
+if __name__ == "__main__":
+    run_inference()
