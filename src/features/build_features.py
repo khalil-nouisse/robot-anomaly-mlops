@@ -8,18 +8,14 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 
 from src.data.ingest import load_data
+from src.utils.core import load_config, setup_logger
+from src.models.autoencoder import LSTMAutoencoder
 
 import yaml
 from pathlib import Path
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-#load configuration variables and paths from the config file : configs/config.yaml
-def load_config(config_path: str = "configs/config.yaml") -> dict:
-    """Loads the YAML configuration file."""
-    with open(config_path, "r") as file:
-        return yaml.safe_load(file)
-
+logger = setup_logger()
 config = load_config()
 
 # Extract variables from the config dictionary

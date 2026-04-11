@@ -8,20 +8,10 @@ from pathlib import Path
 
 # Import our custom architecture
 from src.models.autoencoder import LSTMAutoencoder
+from src.utils.core import load_config, get_device, setup_logger
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = setup_logger()
 
-def load_config(config_path: str = "configs/config.yaml") -> dict:
-    with open(config_path, "r") as file:
-        return yaml.safe_load(file)
-
-def get_device():
-    """Detects if GPU (CUDA/MPS) is available, otherwise uses CPU."""
-    if torch.cuda.is_available():
-        return torch.device("cuda")
-    elif torch.backends.mps.is_available():
-        return torch.device("mps") # Uses your M1 GPU!
-    return torch.device("cpu")
 
 def train_model():
     config = load_config()

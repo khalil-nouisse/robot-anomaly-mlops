@@ -8,17 +8,10 @@ from pathlib import Path
 from sklearn.metrics import roc_auc_score, classification_report
 
 from src.models.autoencoder import LSTMAutoencoder
+from src.utils.core import load_config, get_device, setup_logger
+from src.models.autoencoder import LSTMAutoencoder
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-def load_config(config_path: str = "configs/config.yaml") -> dict:
-    with open(config_path, "r") as file:
-        return yaml.safe_load(file)
-
-def get_device():
-    if torch.cuda.is_available(): return torch.device("cuda")
-    elif torch.backends.mps.is_available(): return torch.device("mps")
-    return torch.device("cpu")
+logger = setup_logger()
 
 def calculate_reconstruction_errors(model, dataloader, device):
     """Runs data through the model and calculates the error for EACH individual sequence."""
