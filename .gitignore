@@ -4,7 +4,7 @@ venv/
 
 # Data and Artifacts
 data/
-models/
+/models/
 mlruns/
 *.db
 
