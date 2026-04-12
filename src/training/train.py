@@ -3,16 +3,19 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 import yaml
+import time
 import logging
 from pathlib import Path
+import mlflow
 
 # Import our custom architecture
 from src.models.autoencoder import LSTMAutoencoder
 from src.utils.core import load_config, get_device, setup_logger
+from src.utils.core import track_experiment
 
 logger = setup_logger()
 
-
+@track_experiment(experiment_name="Voraus_Robotic_Anomaly_Detection")
 def train_model():
     config = load_config()
     
@@ -24,6 +27,9 @@ def train_model():
     params = config['model_params']
     device = get_device()
     logging.info(f"Using device: {device}")
+
+    #log the parameter models to mlflow
+    mlflow.log_params(params)
 
     # 2. Load Data
     logging.info("Loading tensors...")
@@ -53,6 +59,8 @@ def train_model():
     logging.info("Starting Training Loop...")
     for epoch in range(params['epochs']):
 
+        epoch_start_time = time.time()
+
         model.train() # This line turns Dropout On (20% of neurons to zero)
         train_loss = 0.0
         
@@ -81,16 +89,31 @@ def train_model():
                 val_loss += loss.item() * batch_data.size(0)
         
         val_loss /= len(val_loader.dataset)
-        
+
+        epoch_end_time = time.time() 
+        epoch_duration = epoch_end_time - epoch_start_time
+
+        mlflow.log_metrics({
+            "train_loss": train_loss,
+            "val_loss": val_loss,
+            "epoch_duration_sec": epoch_duration
+        }, step=epoch)
+
         # Print progress to the terminal
         if (epoch + 1) % 5 == 0 or epoch == 0:
             logging.info(f"Epoch [{epoch+1}/{params['epochs']}] | Train Loss: {train_loss:.6f} | Val Loss: {val_loss:.6f}")
+
 
     # 6. Save the final model locally
     logging.info("Training complete. Saving model weights...")
     local_model_path = MODELS_DIR / "lstm_autoencoder.pth"
     torch.save(model.state_dict(), local_model_path)
+
     logging.info(f"Model saved successfully to {local_model_path}")
+
+    # Saving the actual PyTorch model to MLflow's database
+    mlflow.pytorch.log_model(model, "model")
+    logger.info(f"Model saved locally and registered in MLflow.")
 
 if __name__ == "__main__":
     train_model()

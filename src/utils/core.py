@@ -2,6 +2,8 @@ import yaml
 import logging
 import torch
 from pathlib import Path
+import mlflow
+import functools
 
 def setup_logger(name="RoboGuard"):
     """Creates a standardized logger for the entire pipeline."""
@@ -19,8 +21,24 @@ def load_config(config_path: str = "configs/config.yaml") -> dict:
 
 def get_device():
     """Detects the best available hardware accelerator (CUDA/MPS/CPU)."""
+    
     if torch.cuda.is_available():
         return torch.device("cuda")
     elif torch.backends.mps.is_available():
         return torch.device("mps")
     return torch.device("cpu")
+
+
+
+def track_experiment(experiment_name):
+    """A decorator that wraps any function with MLflow tracking."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            mlflow.set_experiment(experiment_name)
+            # The 'Engineer' hits Record
+            with mlflow.start_run(): 
+                # The 'Singer' performs (Pytorch training logic)
+                return func(*args, **kwargs)
+        return wrapper
+    return decorator

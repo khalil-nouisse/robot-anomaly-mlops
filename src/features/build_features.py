@@ -44,7 +44,7 @@ def build_windows(df: pd.DataFrame, feature_cols: list) -> tuple:
     sample_stats = df.groupby('sample')['anomaly'].any()
     normal_sample_ids = sample_stats[~sample_stats].index.tolist()
     anomaly_sample_ids = sample_stats[sample_stats].index.tolist()
-
+    
     # Split normal samples into Train and Validation at the SEQUENCE level
     train_ids, val_ids = train_test_split(normal_sample_ids, test_size=0.2, random_state=42)
 

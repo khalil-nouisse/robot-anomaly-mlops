@@ -5,7 +5,9 @@ import numpy as np
 import yaml
 import logging
 from pathlib import Path
-from sklearn.metrics import roc_auc_score, classification_report
+import mlflow
+from sklearn.metrics import roc_auc_score, classification_report, precision_score, recall_score, f1_score
+
 
 from src.models.autoencoder import LSTMAutoencoder
 from src.utils.core import load_config, get_device, setup_logger
@@ -84,11 +86,26 @@ def run_inference():
     y_pred = (y_scores > threshold).astype(int)
 
     # 6. Print the Final Report
+    precision = precision_score(y_true, y_pred)
+    recall = recall_score(y_true, y_pred)
+    f1 = f1_score(y_true, y_pred)
     logging.info("\n" + classification_report(y_true, y_pred, target_names=["Normal", "Anomaly"]))
     
     # AUROC is the standard metric for anomaly detection (1.0 is perfect, 0.5 is random guessing)
     auroc = roc_auc_score(y_true, y_scores)
     logging.info(f"Final AUROC Score: {auroc:.4f}")
+
+    mlflow.set_experiment("Voraus_Robotic_Anomaly_Detection_Eval")
+    with mlflow.start_run(run_name="Model_Evaluation"):
+        logging.info("Logging evaluation metrics to MLflow...")
+        mlflow.log_param("threshold_percentile", 95)
+        mlflow.log_metrics({
+            "auroc_score": auroc,
+            "precision": precision,
+            "recall": recall,
+            "f1_score": f1,
+            "calculated_threshold": threshold
+        })
 
 if __name__ == "__main__":
     run_inference()

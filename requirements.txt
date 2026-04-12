@@ -8,3 +8,5 @@ PyYAML==6.0.3
 scikit_learn==1.8.0
 torch==2.11.0
 uvicorn
+mlflow
+httpx
