@@ -1,0 +1,31 @@
+# docker/Dockerfile.api
+
+# 1. Use a lightweight Python base image
+FROM python:3.11-slim
+
+# 2. Set the working directory inside the container
+WORKDIR /app
+
+# 3. Install system dependencies (sometimes needed for scientific libraries like PyTorch/NumPy)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# 4. Copy ONLY the requirements first. 
+# This is a DevOps trick to leverage Docker caching. If you change your code but not your dependencies, Docker won't rebuild this heavy layer!
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 5. Copy the actual code and artifacts
+COPY src/ /app/src/
+COPY api/ /app/api/
+COPY configs/ /app/configs/
+
+# Note: In a true enterprise system, models are usually pulled from an S3 bucket or MLflow during runtime. 
+COPY models/ /app/models/
+
+# 6. Expose the port Uvicorn will run on
+EXPOSE 8000
+
+# 7. Start the FastAPI server
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
