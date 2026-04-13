@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
+import os
 import yaml
 import time
 import logging
@@ -111,9 +112,20 @@ def train_model():
 
     logging.info(f"Model saved successfully to {local_model_path}")
 
+    # --- dagshub CLOUD REGISTRY ---
+    if "MLFLOW_TRACKING_URI" in os.environ:
+        mlflow.set_tracking_uri(os.environ["MLFLOW_TRACKING_URI"])
+
     # Saving the actual PyTorch model to MLflow's database
     mlflow.pytorch.log_model(model, "model")
     logger.info(f"Model saved locally and registered in MLflow.")
+
+    #  Log the Scaler so the cloud has a backup of it
+    scaler_path = MODELS_DIR / "feature_scaler.pkl"
+    if scaler_path.exists():
+        mlflow.log_artifact(str(scaler_path), artifact_path="preprocessing")
+        
+    logger.info("Artifacts successfully securely pushed to Cloud MLflow Registry.")
 
 if __name__ == "__main__":
     train_model()
