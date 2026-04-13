@@ -1,4 +1,5 @@
 import os
+import shutil
 import mlflow
 from mlflow.tracking import MlflowClient
 from pathlib import Path
@@ -33,13 +34,15 @@ def download_latest_production_artifacts():
     models_dir = Path("models")
     models_dir.mkdir(exist_ok=True)
     
-    # Download the Scaler
-    client.download_artifacts(latest_run_id, "preprocessing/feature_scaler.pkl", dst_path=".")
-    os.rename("preprocessing/feature_scaler.pkl", "models/feature_scaler.pkl")
+    # 1. Download the Scaler and move it
+    print("Downloading Scaler...")
+    local_scaler_path = client.download_artifacts(latest_run_id, "preprocessing/feature_scaler.pkl")
+    shutil.move(local_scaler_path, "models/feature_scaler.pkl")
     
-    # Download the PyTorch Model (MLflow saves it inside a 'data' subfolder)
-    client.download_artifacts(latest_run_id, "model/data/model.pth", dst_path=".")
-    os.rename("model/data/model.pth", "models/lstm_autoencoder.pth")
+    # 2. Download the PyTorch Model and move it
+    print("Downloading PyTorch Model...")
+    local_model_path = client.download_artifacts(latest_run_id, "model/data/model.pth")
+    shutil.move(local_model_path, "models/lstm_autoencoder.pth")
     
     print("All artifacts successfully downloaded from the cloud!")
 
