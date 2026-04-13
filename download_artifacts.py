@@ -4,27 +4,6 @@ import mlflow
 from mlflow.tracking import MlflowClient
 from pathlib import Path
 
-def scan_and_find_weights(client, run_id, path="", indent=""):
-    """Recursively prints the cloud bucket structure AND hunts for the model."""
-    found_file = None
-    artifacts = client.list_artifacts(run_id, path)
-    
-    for file_info in artifacts:
-        # Print the file structure so we can see it in GitHub logs!
-        print(f"{indent} |- {file_info.path}")
-        
-        if file_info.is_dir:
-            # Dig deeper into the folder
-            res = scan_and_find_weights(client, run_id, file_info.path, indent + "  ")
-            if res and not found_file:
-                found_file = res
-        else:
-            # Broaden the search: Look for .pth, .pt, or .pkl inside the model directory
-            if "model/data/" in file_info.path and file_info.path.endswith((".pth", ".pt", ".pkl")):
-                found_file = file_info.path
-                
-    return found_file
-
 def download_latest_production_artifacts():
     print("Connecting to Cloud MLflow Registry...")
     
@@ -60,15 +39,9 @@ def download_latest_production_artifacts():
     local_scaler_path = client.download_artifacts(latest_run_id, "preprocessing/feature_scaler.pkl")
     shutil.move(local_scaler_path, "models/feature_scaler.pkl")
     
-    # 2. Map the bucket and find the PyTorch model
-    print("Scanning cloud bucket contents:")
-    pth_cloud_path = scan_and_find_weights(client, latest_run_id)
-    
-    if not pth_cloud_path:
-        raise FileNotFoundError("Could not find the model weights! Check the printed file tree above.")
-        
-    print(f"\nTarget acquired! Found weights at: {pth_cloud_path}. Downloading...")
-    local_model_path = client.download_artifacts(latest_run_id, pth_cloud_path)
+    # 2. Download the PyTorch Model (Using the exact mapped cloud path!)
+    print("Downloading PyTorch Model...")
+    local_model_path = client.download_artifacts(latest_run_id, "model/lstm_autoencoder.pth")
     shutil.move(local_model_path, "models/lstm_autoencoder.pth")
     
     print("All artifacts successfully downloaded from the cloud!")
