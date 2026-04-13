@@ -113,12 +113,8 @@ def train_model():
     logging.info(f"Model saved successfully to {local_model_path}")
 
     # --- dagshub CLOUD REGISTRY ---
-    if "MLFLOW_TRACKING_URI" in os.environ:
-        mlflow.set_tracking_uri(os.environ["MLFLOW_TRACKING_URI"])
-
-    # Saving the actual PyTorch model to MLflow's database
-    mlflow.pytorch.log_model(model, "model")
-    logger.info(f"Model saved locally and registered in MLflow.")
+    # Log the raw PyTorch weights DIRECTLY to the cloud (The Bulletproof Way)
+    mlflow.log_artifact(str(local_model_path), artifact_path="model")
 
     #  Log the Scaler so the cloud has a backup of it
     scaler_path = MODELS_DIR / "feature_scaler.pkl"
