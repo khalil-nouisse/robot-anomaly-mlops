@@ -8,10 +8,19 @@ model:
 
 model_params:
   n_features: 130   # 137 total - 7 ignored = 130
-  hidden_dim: 64    # How much we compress the data (the bottleneck)
+  hidden_dim: 32    # How much we compress the data (the bottleneck)
   n_layers: 2       # Number of LSTM layers
-  dropout: 0.2
+  dropout: 0.3
   learning_rate: 0.001
   batch_size: 32
-  epochs: 50
+  epochs: 100
   threshold : 1.53305 
+
+
+
+# tunning parameters : 
+# hidden_dim: [64 , 32 , 16]
+# dropout: [0.2 , 0.3  , 0.4]
+# epochs : [50 , 100 , 150]
+
+#drop treshhold percentil  [95 , 90 , 85 ]

@@ -5,9 +5,9 @@ class LSTMAutoencoder(nn.Module):
     def __init__(self, n_features: int, hidden_dim: int, n_layers: int = 1, dropout: float = 0.0):
         super(LSTMAutoencoder, self).__init__()
         
-        self.n_features = n_features
-        self.hidden_dim = hidden_dim
-        self.n_layers = n_layers
+        self.n_features = n_features  #132
+        self.hidden_dim = hidden_dim  #64
+        self.n_layers = n_layers    #2
 
         # -------------------
         # ENCODER

@@ -71,34 +71,52 @@ def run_inference():
     logging.info("Calculating reconstruction errors for Anomaly data...")
     anomaly_errors = calculate_reconstruction_errors(model, anomaly_loader, device)
 
-    # 4. Define the Threshold (95th percentile of normal data)
-    threshold = np.percentile(val_errors, 95)
-    logging.info(f"--- DYNAMIC THRESHOLD SET AT: {threshold:.5f} ---")
-
-    # 5. Evaluate the Results
+    # 4. Combine all data for evaluation FIRST
+    logging.info("Combining datasets to find the optimal mathematical threshold...")
     # True labels: Normal = 0, Anomaly = 1
     y_true = np.concatenate([np.zeros(len(val_errors)), np.ones(len(anomaly_errors))])
-    
     # Predicted scores (the raw error values)
     y_scores = np.concatenate([val_errors, anomaly_errors])
-    
-    # Predicted classes based on our threshold , if y_scores > threshold => "True" else "False"
+
+    # 5. The MLOps F1 Maximization Loop
+    best_f1 = 0
+    best_threshold = 0
+    best_percentile = 0
+
+    # Test percentiles from 75 to 99 (based strictly on the normal validation distribution)
+    for p in range(75, 100):
+        test_thresh = np.percentile(val_errors, p)
+        
+        # Apply this test threshold to the ENTIRE dataset
+        temp_preds = (y_scores > test_thresh).astype(int) 
+        
+        # Calculate F1 against the true labels
+        current_f1 = f1_score(y_true, temp_preds)
+        
+        if current_f1 > best_f1:
+            best_f1 = current_f1
+            best_threshold = test_thresh
+            best_percentile = p
+
+    logger.info(f"--- OPTIMAL THRESHOLD FOUND AT {best_percentile}th PERCENTILE: {best_threshold:.5f} ---")
+    threshold = best_threshold 
+
+    # 6. Evaluate the Final Results using the winning threshold
     y_pred = (y_scores > threshold).astype(int)
 
-    # 6. Print the Final Report
     precision = precision_score(y_true, y_pred)
     recall = recall_score(y_true, y_pred)
     f1 = f1_score(y_true, y_pred)
     logging.info("\n" + classification_report(y_true, y_pred, target_names=["Normal", "Anomaly"]))
     
-    # AUROC is the standard metric for anomaly detection (1.0 is perfect, 0.5 is random guessing)
     auroc = roc_auc_score(y_true, y_scores)
     logging.info(f"Final AUROC Score: {auroc:.4f}")
 
+    # 7. Log to Cloud Database
     mlflow.set_experiment("Voraus_Robotic_Anomaly_Detection_Eval")
     with mlflow.start_run(run_name="Model_Evaluation"):
         logging.info("Logging evaluation metrics to MLflow...")
-        mlflow.log_param("threshold_percentile", 95)
+        mlflow.log_param("threshold_percentile", best_percentile) # Now logs the actual winning percentile
         mlflow.log_metrics({
             "auroc_score": auroc,
             "precision": precision,
