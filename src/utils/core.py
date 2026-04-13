@@ -1,9 +1,12 @@
-import yaml
 import logging
 import torch
 from pathlib import Path
 import mlflow
 import functools
+import yaml
+from dotenv import load_dotenv
+
+load_dotenv()
 
 def setup_logger(name="RoboGuard"):
     """Creates a standardized logger for the entire pipeline."""
@@ -21,7 +24,7 @@ def load_config(config_path: str = "configs/config.yaml") -> dict:
 
 def get_device():
     """Detects the best available hardware accelerator (CUDA/MPS/CPU)."""
-    
+
     if torch.cuda.is_available():
         return torch.device("cuda")
     elif torch.backends.mps.is_available():
