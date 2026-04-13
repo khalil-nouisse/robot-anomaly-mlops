@@ -34,15 +34,23 @@ def download_latest_production_artifacts():
     models_dir = Path("models")
     models_dir.mkdir(exist_ok=True)
     
-    # 1. Download the Scaler and move it
+    # 1. Download the Scaler
     print("Downloading Scaler...")
     local_scaler_path = client.download_artifacts(latest_run_id, "preprocessing/feature_scaler.pkl")
     shutil.move(local_scaler_path, "models/feature_scaler.pkl")
     
-    # 2. Download the PyTorch Model and move it
-    print("Downloading PyTorch Model...")
-    local_model_path = client.download_artifacts(latest_run_id, "model/data/model.pth")
-    shutil.move(local_model_path, "models/lstm_autoencoder.pth")
+    # 2. Download the entire PyTorch Model folder
+    print("Downloading PyTorch Model directory...")
+    local_model_dir = client.download_artifacts(latest_run_id, "model")
+    
+    # 3. Recursively search inside the folder for the .pth weights file
+    pth_files = list(Path(local_model_dir).rglob("*.pth"))
+    
+    if not pth_files:
+        raise FileNotFoundError("Could not find a .pth file inside the MLflow model folder!")
+        
+    # Move the found weights file to the exact spot our API expects
+    shutil.move(str(pth_files[0]), "models/lstm_autoencoder.pth")
     
     print("All artifacts successfully downloaded from the cloud!")
 
