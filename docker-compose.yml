@@ -1,10 +1,10 @@
 services:
   # AI Prediction API
   api:
-    build: 
+    build:
       context: .
       # Update this if your Dockerfile has a different name/path!
-      dockerfile: docker/Dockerfile.api 
+      dockerfile: docker/Dockerfile.api
     ports:
       - "8000:8000"
     networks:
