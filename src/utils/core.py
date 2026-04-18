@@ -4,6 +4,8 @@ from pathlib import Path
 import mlflow
 import functools
 import yaml
+import re
+from mlflow.tracking import MlflowClient
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -45,3 +47,27 @@ def track_experiment(experiment_name):
                 return func(*args, **kwargs)
         return wrapper
     return decorator
+
+
+def get_next_versioned_run_name(experiment_name: str, run_prefix: str) -> str:
+    """Builds a run name like '<prefix>:V5' by inspecting existing runs."""
+    client = MlflowClient()
+    experiment = client.get_experiment_by_name(experiment_name)
+    if experiment is None:
+        return f"{run_prefix}:V1"
+
+    runs = client.search_runs(
+        experiment_ids=[experiment.experiment_id],
+        max_results=50000,
+        order_by=["start_time DESC"],
+    )
+
+    pattern = re.compile(rf"^{re.escape(run_prefix)}:V(\d+)$")
+    max_version = 0
+    for run in runs:
+        run_name = run.data.tags.get("mlflow.runName", "")
+        match = pattern.match(run_name)
+        if match:
+            max_version = max(max_version, int(match.group(1)))
+
+    return f"{run_prefix}:V{max_version + 1}"
