@@ -1,16 +1,40 @@
 import pytest
 from fastapi.testclient import TestClient
 import numpy as np
+import torch
 
 # Import your FastAPI app and config loader
 from api.main import app
 from src.utils.core import load_config
+from src.models.autoencoder import LSTMAutoencoder, GRUAutoencoder
+from src.utils.artifacts import get_model_path, get_model_type
 
 # 1. Initialize the TestClient
 # Note: Using 'with TestClient(app)' triggers your @asynccontextmanager lifespan 
 # so the model and scaler load perfectly into RAM for the tests!
 @pytest.fixture(scope="module")
 def client():
+    config = load_config()
+    model_path = get_model_path(config)
+    model_path.parent.mkdir(parents=True, exist_ok=True)
+    if not model_path.exists():
+        params = config["model_params"]
+        model_type = get_model_type(config)
+        if model_type == "GRU":
+            model = GRUAutoencoder(
+                n_features=params["n_features"],
+                hidden_dim=params["hidden_dim"],
+                n_layers=params["n_layers"],
+                dropout=params.get("dropout", 0.0),
+            )
+        else:
+            model = LSTMAutoencoder(
+                n_features=params["n_features"],
+                hidden_dim=params["hidden_dim"],
+                n_layers=params["n_layers"],
+                dropout=params.get("dropout", 0.0),
+            )
+        torch.save(model.state_dict(), model_path)
     with TestClient(app) as c:
         yield c
 
@@ -72,3 +96,15 @@ def test_predict_invalid_features(client, config):
     response = client.post("/predict", json=payload)
     
     assert response.status_code == 400
+
+def test_healthz(client):
+    response = client.get("/healthz")
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+
+def test_readyz(client):
+    response = client.get("/readyz")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ready"] is True
+    assert body["model_type"] in {"LSTM", "GRU"}
