@@ -57,6 +57,51 @@ class LSTMAutoencoder(nn.Module):
         
         return reconstruction
 
+
+class GRUAutoencoder(nn.Module):
+    def __init__(self, n_features, hidden_dim, n_layers, dropout=0.2):
+        super(GRUAutoencoder, self).__init__()
+        
+        self.n_features = n_features
+        self.hidden_dim = hidden_dim
+        self.n_layers = n_layers
+        
+        # 1. The Encoder (Compresses data) - Notice it says nn.GRU now!
+        self.encoder = nn.GRU(
+            input_size=n_features, 
+            hidden_size=hidden_dim, 
+            num_layers=n_layers, 
+            batch_first=True,               #(batch, seq_len, features)
+            dropout=dropout if n_layers > 1 else 0
+        )
+        
+        # 2. The Decoder (Reconstructs data)
+        self.decoder = nn.GRU(
+            input_size=hidden_dim, 
+            hidden_size=hidden_dim, 
+            num_layers=n_layers, 
+            batch_first=True,
+            dropout=dropout if n_layers > 1 else 0
+        )
+        
+        # 3. The Output Layer (Projects back to 130 features)
+        self.output_layer = nn.Linear(hidden_dim, n_features)
+        
+    def forward(self, x):
+        # x shape: (batch_size, sequence_length, n_features)
+        
+        # Encode
+        encoded_seq, _ = self.encoder(x)
+        
+        # Decode
+        decoded_seq, _ = self.decoder(encoded_seq)
+        
+        # Reconstruct
+        reconstruction = self.output_layer(decoded_seq)
+        
+        return reconstruction
+
+
 if __name__ == "__main__":
     # Quick sanity check to ensure the tensor math works before we train
     logging_setup = True

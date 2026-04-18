@@ -11,7 +11,7 @@ from sklearn.metrics import roc_auc_score, classification_report, precision_scor
 
 from src.models.autoencoder import LSTMAutoencoder
 from src.utils.core import load_config, get_device, setup_logger
-from src.models.autoencoder import LSTMAutoencoder
+from src.models.autoencoder import LSTMAutoencoder, GRUAutoencoder
 
 logger = setup_logger()
 
@@ -47,11 +47,23 @@ def run_inference():
     
     # 1. Load the Trained Model
     logging.info("Loading trained model architecture and weights...")
-    model = LSTMAutoencoder(
-        n_features=params['n_features'],
-        hidden_dim=params['hidden_dim'],
-        n_layers=params['n_layers']
-    ).to(device)
+
+    model_type = params.get('model_type', 'LSTM')
+
+    if model_type == "GRU" :
+        model = GRUAutoencoder(
+            n_features=params['n_features'],
+            hidden_dim=params['hidden_dim'],
+            n_layers=params['n_layers'],
+            dropout=params['dropout']
+        ).to(device)
+    else :
+        model = LSTMAutoencoder(
+            n_features=params['n_features'],
+            hidden_dim=params['hidden_dim'],
+            n_layers=params['n_layers'],
+            dropout=params['dropout']
+        ).to(device)
     
     # Inject the learned brain (the .pth file) into the architecture
     model.load_state_dict(torch.load(MODEL_PATH, map_location=device, weights_only=True))
@@ -116,7 +128,10 @@ def run_inference():
     mlflow.set_experiment("Voraus_Robotic_Anomaly_Detection_Eval")
     with mlflow.start_run(run_name="Model_Evaluation"):
         logging.info("Logging evaluation metrics to MLflow...")
-        mlflow.log_param("threshold_percentile", best_percentile) # Now logs the actual winning percentile
+        #log model type to mlflow
+        mlflow.log_param("model_type", params.get('model_type', 'LSTM'))
+        # Now logs the actual winning percentile
+        mlflow.log_param("threshold_percentile", best_percentile) 
         mlflow.log_metrics({
             "auroc_score": auroc,
             "precision": precision,

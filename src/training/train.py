@@ -13,14 +13,41 @@ import mlflow
 from src.models.autoencoder import LSTMAutoencoder
 from src.utils.core import load_config, get_device, setup_logger
 from src.utils.core import track_experiment
+from src.models.autoencoder import LSTMAutoencoder, GRUAutoencoder
 
 logger = setup_logger()
+
+class EarlyStopping:
+    def __init__(self, patience=5, min_delta=0.001):
+        """
+        Args:
+            patience (int): How many epochs to wait after last time validation loss improved.
+            min_delta (float): Minimum change in the monitored quantity to qualify as an improvement.
+        """
+        self.patience = patience
+        self.min_delta = min_delta
+        self.counter = 0
+        self.best_loss = None
+        self.early_stop = False
+
+    def __call__(self, val_loss):
+        if self.best_loss is None:
+            self.best_loss = val_loss
+        elif val_loss > self.best_loss - self.min_delta:
+            self.counter += 1
+            if self.counter >= self.patience:
+                self.early_stop = True
+        else:
+            self.best_loss = val_loss
+            self.counter = 0
+
+
 
 @track_experiment(experiment_name="Voraus_Robotic_Anomaly_Detection")
 def train_model():
     config = load_config()
     
-    # 1. Setup Paths & Params
+    # Setup Paths & Params
     PROCESSED_DIR = Path(config['data']['processed_dir'])
     MODELS_DIR = Path(config['model']['models_dir'])
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
@@ -29,10 +56,13 @@ def train_model():
     device = get_device()
     logging.info(f"Using device: {device}")
 
+
+    #log the model type to mlflow
+    mlflow.log_param("model_type", params.get('model_type', 'LSTM'))
     #log the parameter models to mlflow
     mlflow.log_params(params)
 
-    # 2. Load Data
+    # Load Data
     logging.info("Loading tensors...")
     try:
         X_train = torch.load(PROCESSED_DIR / "X_train.pt")
@@ -41,23 +71,37 @@ def train_model():
         logging.error("Tensors not found. Did you run src.features.build_features?")
         return
 
-    # 3. Create DataLoaders
+    # Create DataLoaders
     train_loader = DataLoader(TensorDataset(X_train), batch_size=params['batch_size'], shuffle=True)
     val_loader = DataLoader(TensorDataset(X_val), batch_size=params['batch_size'], shuffle=False)
 
-    # 4. Initialize Model, Loss, and Optimizer
-    model = LSTMAutoencoder(
-        n_features=params['n_features'],
-        hidden_dim=params['hidden_dim'],
-        n_layers=params['n_layers'],
-        dropout=params['dropout']
-    ).to(device)
+    
+    # Initialize Model, Loss, and Optimizer
+    model_type = params.get('model_type', 'LSTM')
+
+    if model_type == "GRU" :
+        model = GRUAutoencoder(
+            n_features=params['n_features'],
+            hidden_dim=params['hidden_dim'],
+            n_layers=params['n_layers'],
+            dropout=params['dropout']
+        ).to(device)
+    else :
+        model = LSTMAutoencoder(
+            n_features=params['n_features'],
+            hidden_dim=params['hidden_dim'],
+            n_layers=params['n_layers'],
+            dropout=params['dropout']
+        ).to(device)
     
     criterion = nn.MSELoss() 
     optimizer = optim.Adam(model.parameters(), lr=params['learning_rate'])
 
     # 5. PyTorch Training Loop
+
+    early_stopping = EarlyStopping(patience=7, min_delta=0.001)
     logging.info("Starting Training Loop...")
+
     for epoch in range(params['epochs']):
 
         epoch_start_time = time.time()
@@ -104,6 +148,10 @@ def train_model():
         if (epoch + 1) % 5 == 0 or epoch == 0:
             logging.info(f"Epoch [{epoch+1}/{params['epochs']}] | Train Loss: {train_loss:.6f} | Val Loss: {val_loss:.6f}")
 
+        early_stopping(val_loss)
+        if early_stopping.early_stop:
+            logger.info(f"--- Early Stopping Triggered at Epoch {epoch+1}! Loss has stabilized. ---")
+            break # Break out of the epochs!
 
     # 6. Save the final model locally
     logging.info("Training complete. Saving model weights...")
@@ -125,3 +173,8 @@ def train_model():
 
 if __name__ == "__main__":
     train_model()
+
+
+
+
+

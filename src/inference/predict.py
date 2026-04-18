@@ -32,14 +32,40 @@ class RoboGuardPredictor:
         
         # Load Model
         params = self.config['model_params']
-        self.model = LSTMAutoencoder(
-            n_features=params['n_features'],
-            hidden_dim=params['hidden_dim'],
-            n_layers=params['n_layers']
-        ).to(self.device)
+        model_type = params.get('model_type', 'LSTM')
+
+        if model_type == 'GRU':
+            from src.models.autoencoder import GRUAutoencoder
+            self.model = GRUAutoencoder(
+                n_features=params['n_features'],
+                hidden_dim=params['hidden_dim'],
+                n_layers=params['n_layers']
+            ).to(self.device)
+        else:
+            self.model = LSTMAutoencoder(
+                n_features=params['n_features'],
+                hidden_dim=params['hidden_dim'],
+                n_layers=params['n_layers']
+            ).to(self.device)
         
-        model_path = models_dir / "lstm_autoencoder.pth"
-        self.model.load_state_dict(torch.load(model_path, map_location=self.device, weights_only=True))
+        # Determine the expected file name (e.g. 'lstm_autoencoder.pth' or 'gru_autoencoder.pth')
+        preferred_name = f"{model_type.lower()}_autoencoder.pth"
+        model_path = models_dir / preferred_name
+        
+        # Fallback mechanism: if they asked for GRU but the only file is named 'lstm_...pth', use it
+        if model_type == 'GRU' and not model_path.exists():
+            fallback_path = models_dir / "lstm_autoencoder.pth"
+            if fallback_path.exists():
+                model_path = fallback_path
+                
+        if model_path.exists():
+            try:
+                self.model.load_state_dict(torch.load(model_path, map_location=self.device, weights_only=True))
+            except RuntimeError as e:
+                logger.error(f"SHAPE MISMATCH: The weights in '{model_path.name}' do not match the {model_type} architecture. The API will start, but the AI is untrained! Error: {e}")
+        else:
+            logger.error(f"CHECKPOINT MISSING: Could not find {model_path}. The API will start, but the AI is untrained!")
+
         self.model.eval()
         
         logger.info("Predictor artifacts loaded successfully into RAM.")

@@ -6,6 +6,8 @@ import numpy as np
 from src.inference.predict import RoboGuardPredictor
 from src.utils.core import load_config
 from api.schemas import RobotSequence, AnomalyResponse
+from prometheus_fastapi_instrumentator import Instrumentator
+from prometheus_client import Counter
 
 
 config = load_config()
@@ -28,6 +30,9 @@ app = FastAPI(
     description="Real-time Anomaly Detection for Pick-and-Place Robots",
     version="1.0.0"
 )
+anomaly_counter = Counter("roboguard_anomalies_total", "Total anomalies")
+# Instrument the app to expose /metrics
+Instrumentator().instrument(app).expose(app)
 
 @app.post("/predict", response_model=AnomalyResponse)
 async def predict_anomaly(payload: RobotSequence):
@@ -49,6 +54,10 @@ async def predict_anomaly(payload: RobotSequence):
     # 3. Delegate to the AI Engine
     try:
         is_anomaly, error_score = predictor.predict(raw_data)
+        
+        # Increment our custom Prometheus metric if an anomaly is found!
+        if is_anomaly:
+            anomaly_counter.inc(1)
         
         # 4. Return HTTP Response
         return AnomalyResponse(
