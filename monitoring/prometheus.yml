@@ -1,0 +1,8 @@
+global:
+  scrape_interval: 5s # Check the robot sensors every 5 seconds
+
+scrape_configs:
+  - job_name: 'roboguard_api'
+    static_configs:
+      # 'api' will be the name of our FastAPI Docker container
+      - targets: ['api:8000']

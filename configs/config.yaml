@@ -7,6 +7,7 @@ model:
   fixed_length: 250
 
 model_params:
+  model_type: "GRU"
   n_features: 130   # 137 total - 7 ignored = 130
   hidden_dim: 32    # How much we compress the data (the bottleneck)
   n_layers: 2       # Number of LSTM layers
