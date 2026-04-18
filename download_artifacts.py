@@ -3,6 +3,8 @@ import shutil
 import mlflow
 from mlflow.tracking import MlflowClient
 from pathlib import Path
+from src.utils.core import load_config
+from src.utils.artifacts import get_model_filename, get_model_type
 
 def download_latest_production_artifacts():
     print("Connecting to Cloud MLflow Registry...")
@@ -33,16 +35,28 @@ def download_latest_production_artifacts():
     # Ensure the local models directory exists
     models_dir = Path("models")
     models_dir.mkdir(exist_ok=True)
+
+    config = load_config()
+    model_type = get_model_type(config)
+    model_filename = get_model_filename(model_type)
     
     # 1. Download the Scaler
     print("Downloading Scaler...")
     local_scaler_path = client.download_artifacts(latest_run_id, "preprocessing/feature_scaler.pkl")
     shutil.move(local_scaler_path, "models/feature_scaler.pkl")
     
-    # 2. Download the PyTorch Model (Using the exact mapped cloud path!)
+    # 2. Download the PyTorch Model
     print("Downloading PyTorch Model...")
-    local_model_path = client.download_artifacts(latest_run_id, "model/lstm_autoencoder.pth")
-    shutil.move(local_model_path, "models/lstm_autoencoder.pth")
+    local_model_path = client.download_artifacts(latest_run_id, f"model/{model_filename}")
+    shutil.move(local_model_path, f"models/{model_filename}")
+
+    # 3. Download threshold artifact when available
+    try:
+        print("Downloading Threshold Artifact...")
+        local_threshold_path = client.download_artifacts(latest_run_id, "threshold/threshold.json")
+        shutil.move(local_threshold_path, "models/threshold.json")
+    except Exception:
+        print("Threshold artifact not found in this run. Falling back to config threshold at runtime.")
     
     print("All artifacts successfully downloaded from the cloud!")
 

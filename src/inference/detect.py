@@ -2,16 +2,16 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 import numpy as np
-import yaml
 import logging
+import json
 from pathlib import Path
+from datetime import datetime, timezone
 import mlflow
 from sklearn.metrics import roc_auc_score, classification_report, precision_score, recall_score, f1_score
 
-
-from src.models.autoencoder import LSTMAutoencoder
-from src.utils.core import load_config, get_device, setup_logger
+from src.utils.core import load_config, get_device, setup_logger, get_next_versioned_run_name
 from src.models.autoencoder import LSTMAutoencoder, GRUAutoencoder
+from src.utils.artifacts import get_model_path, get_model_type, get_threshold_path
 
 logger = setup_logger()
 
@@ -43,12 +43,12 @@ def run_inference():
     device = get_device()
     
     PROCESSED_DIR = Path(config['data']['processed_dir'])
-    MODEL_PATH = Path(config['model']['models_dir']) / "lstm_autoencoder.pth"
+    MODEL_PATH = get_model_path(config)
     
     # 1. Load the Trained Model
     logging.info("Loading trained model architecture and weights...")
 
-    model_type = params.get('model_type', 'LSTM')
+    model_type = get_model_type(config)
 
     if model_type == "GRU" :
         model = GRUAutoencoder(
@@ -66,6 +66,8 @@ def run_inference():
         ).to(device)
     
     # Inject the learned brain (the .pth file) into the architecture
+    if not MODEL_PATH.exists():
+        raise FileNotFoundError(f"Model checkpoint not found at {MODEL_PATH}")
     model.load_state_dict(torch.load(MODEL_PATH, map_location=device, weights_only=True))
     
     # 2. Load the Data
@@ -113,6 +115,18 @@ def run_inference():
     logger.info(f"--- OPTIMAL THRESHOLD FOUND AT {best_percentile}th PERCENTILE: {best_threshold:.5f} ---")
     threshold = best_threshold 
 
+    threshold_payload = {
+        "model_type": model_type,
+        "threshold": float(threshold),
+        "threshold_percentile": int(best_percentile),
+        "created_at_utc": datetime.now(timezone.utc).isoformat(),
+    }
+    threshold_path = get_threshold_path(config)
+    threshold_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(threshold_path, "w", encoding="utf-8") as handle:
+        json.dump(threshold_payload, handle, indent=2)
+    logger.info(f"Saved threshold artifact to {threshold_path}")
+
     # 6. Evaluate the Final Results using the winning threshold
     y_pred = (y_scores > threshold).astype(int)
 
@@ -125,11 +139,16 @@ def run_inference():
     logging.info(f"Final AUROC Score: {auroc:.4f}")
 
     # 7. Log to Cloud Database
-    mlflow.set_experiment("Voraus_Robotic_Anomaly_Detection_Eval")
-    with mlflow.start_run(run_name="Model_Evaluation"):
+    eval_experiment_name = "Voraus_Robotic_Anomaly_Detection_Eval"
+    eval_run_name = get_next_versioned_run_name(
+        experiment_name=eval_experiment_name,
+        run_prefix=f"{model_type}_evaluation",
+    )
+    mlflow.set_experiment(eval_experiment_name)
+    with mlflow.start_run(run_name=eval_run_name):
         logging.info("Logging evaluation metrics to MLflow...")
         #log model type to mlflow
-        mlflow.log_param("model_type", params.get('model_type', 'LSTM'))
+        mlflow.log_param("model_type", model_type)
         # Now logs the actual winning percentile
         mlflow.log_param("threshold_percentile", best_percentile) 
         mlflow.log_metrics({
@@ -139,6 +158,7 @@ def run_inference():
             "f1_score": f1,
             "calculated_threshold": threshold
         })
+        mlflow.log_artifact(str(threshold_path), artifact_path="threshold")
 
 if __name__ == "__main__":
     run_inference()

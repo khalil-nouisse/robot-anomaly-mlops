@@ -6,6 +6,7 @@ import logging
 
 from src.models.autoencoder import LSTMAutoencoder
 from src.utils.core import load_config, get_device
+from src.utils.artifacts import get_model_path, get_model_type, load_threshold
 
 logger = logging.getLogger("RoboGuard")
 
@@ -18,7 +19,9 @@ class RoboGuardPredictor:
         self.model = None
         self.scaler = None
 
-        self.threshold = self.config['model_params']['threshold']
+        self.threshold = load_threshold(self.config)
+        self.model_type = get_model_type(self.config)
+        self.artifacts_loaded = False
 
     def load_artifacts(self):
         """Loads the weights and scaler from disk into memory."""
@@ -29,11 +32,16 @@ class RoboGuardPredictor:
         if not scaler_path.exists():
             raise FileNotFoundError("Scaler artifact missing.")
         self.scaler = joblib.load(scaler_path)
+        expected_features = int(self.config["model_params"]["n_features"])
+        n_features_in = getattr(self.scaler, "n_features_in_", None)
+        if n_features_in is not None and int(n_features_in) != expected_features:
+            raise ValueError(
+                f"Scaler features mismatch: expected {expected_features}, got {n_features_in}"
+            )
         
         # Load Model
         params = self.config['model_params']
-        model_type = params.get('model_type', 'LSTM')
-
+        model_type = self.model_type
         if model_type == 'GRU':
             from src.models.autoencoder import GRUAutoencoder
             self.model = GRUAutoencoder(
@@ -48,30 +56,27 @@ class RoboGuardPredictor:
                 n_layers=params['n_layers']
             ).to(self.device)
         
-        # Determine the expected file name (e.g. 'lstm_autoencoder.pth' or 'gru_autoencoder.pth')
-        preferred_name = f"{model_type.lower()}_autoencoder.pth"
-        model_path = models_dir / preferred_name
-        
-        # Fallback mechanism: if they asked for GRU but the only file is named 'lstm_...pth', use it
-        if model_type == 'GRU' and not model_path.exists():
-            fallback_path = models_dir / "lstm_autoencoder.pth"
-            if fallback_path.exists():
-                model_path = fallback_path
-                
-        if model_path.exists():
-            try:
-                self.model.load_state_dict(torch.load(model_path, map_location=self.device, weights_only=True))
-            except RuntimeError as e:
-                logger.error(f"SHAPE MISMATCH: The weights in '{model_path.name}' do not match the {model_type} architecture. The API will start, but the AI is untrained! Error: {e}")
-        else:
-            logger.error(f"CHECKPOINT MISSING: Could not find {model_path}. The API will start, but the AI is untrained!")
+        model_path = get_model_path(self.config)
+        if not model_path.exists():
+            raise FileNotFoundError(f"Checkpoint missing at {model_path}")
+        try:
+            self.model.load_state_dict(
+                torch.load(model_path, map_location=self.device, weights_only=True)
+            )
+        except RuntimeError as e:
+            raise RuntimeError(
+                f"Weights in '{model_path.name}' do not match {model_type} architecture."
+            ) from e
 
         self.model.eval()
+        self.artifacts_loaded = True
         
         logger.info("Predictor artifacts loaded successfully into RAM.")
 
     def predict(self, raw_data: np.ndarray) -> tuple[bool, float]:
         """Handles the scaling, tensor math, and thresholding."""
+        if not self.artifacts_loaded or self.model is None or self.scaler is None:
+            raise RuntimeError("Predictor artifacts are not loaded.")
         # 1. Scale
         scaled_data = self.scaler.transform(raw_data)
         
