@@ -14,7 +14,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # 4. Copy ONLY the requirements first. 
 # This is a DevOps trick to leverage Docker caching. If you change your code but not your dependencies, Docker won't rebuild this heavy layer!
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+#  Install PyTorch explicitly first, with a huge timeout limit and pointing to the CPU-only index
+RUN pip install --default-timeout=1000 --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+
+#  Install the rest of your requirements
+RUN pip install --default-timeout=1000 --no-cache-dir -r requirements.txt
 
 # 5. Copy the actual code and artifacts
 COPY src/ /app/src/

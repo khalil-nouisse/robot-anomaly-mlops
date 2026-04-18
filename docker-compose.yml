@@ -1,0 +1,39 @@
+services:
+  # AI Prediction API
+  api:
+    build: 
+      context: .
+      # Update this if your Dockerfile has a different name/path!
+      dockerfile: docker/Dockerfile.api 
+    ports:
+      - "8000:8000"
+    networks:
+      - roboguard_network
+
+  # The Time-Series Database
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - roboguard_network
+    depends_on:
+      - api
+
+  # The Dashboard
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    networks:
+      - roboguard_network
+    depends_on:
+      - prometheus
+
+networks:
+  roboguard_network:
+    driver: bridge
