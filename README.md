@@ -1,7 +1,4 @@
-<div align="center">
-  <img src="images/LOGO_ENSAM.png" alt="ENSAM Logo" width="200"/>
-  <h1>RoboGuard-AI</h1>
-</div>
+# RoboGuard-AI
 
 An End-to-End Deep Learning & MLOps System for Multivariate Time-Series Anomaly Detection in Robotic Systems
 
