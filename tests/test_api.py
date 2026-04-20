@@ -2,6 +2,8 @@ import pytest
 from fastapi.testclient import TestClient
 import numpy as np
 import torch
+import joblib
+from sklearn.preprocessing import StandardScaler
 
 # Import your FastAPI app and config loader
 from api.main import app
@@ -17,24 +19,29 @@ def client():
     config = load_config()
     model_path = get_model_path(config)
     model_path.parent.mkdir(parents=True, exist_ok=True)
-    if not model_path.exists():
-        params = config["model_params"]
-        model_type = get_model_type(config)
-        if model_type == "GRU":
-            model = GRUAutoencoder(
-                n_features=params["n_features"],
-                hidden_dim=params["hidden_dim"],
-                n_layers=params["n_layers"],
-                dropout=params.get("dropout", 0.0),
-            )
-        else:
-            model = LSTMAutoencoder(
-                n_features=params["n_features"],
-                hidden_dim=params["hidden_dim"],
-                n_layers=params["n_layers"],
-                dropout=params.get("dropout", 0.0),
-            )
-        torch.save(model.state_dict(), model_path)
+    params = config["model_params"]
+    model_type = get_model_type(config)
+    n_features = int(params["n_features"])
+
+    # Make API tests independent from external/downstream downloaded artifacts.
+    scaler = StandardScaler().fit(np.random.randn(256, n_features))
+    joblib.dump(scaler, model_path.parent / "feature_scaler.pkl")
+
+    if model_type == "GRU":
+        model = GRUAutoencoder(
+            n_features=n_features,
+            hidden_dim=params["hidden_dim"],
+            n_layers=params["n_layers"],
+            dropout=params.get("dropout", 0.0),
+        )
+    else:
+        model = LSTMAutoencoder(
+            n_features=n_features,
+            hidden_dim=params["hidden_dim"],
+            n_layers=params["n_layers"],
+            dropout=params.get("dropout", 0.0),
+        )
+    torch.save(model.state_dict(), model_path)
     with TestClient(app) as c:
         yield c
 

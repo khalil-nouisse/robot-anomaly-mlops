@@ -38,7 +38,6 @@ class EarlyStopping:
             self.counter = 0
 
 
-
 def train_model():
     config = load_config()
     experiment_name = "Voraus_Robotic_Anomaly_Detection"

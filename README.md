@@ -92,6 +92,8 @@ docker compose up --build -d
 ### 4. Verify Endpoints
 *   **API Docs:** `http://localhost:8000/docs`
 *   **Prometheus Metrics:** `http://localhost:8000/metrics`
+*   **Liveness:** `http://localhost:8000/healthz`
+*   **Readiness:** `http://localhost:8000/readyz`
 *   **Grafana Dashboard:** `http://localhost:3000` (Login: admin/admin)
 
 ### 5. Generate Test Traffic
