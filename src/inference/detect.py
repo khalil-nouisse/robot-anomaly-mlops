@@ -37,7 +37,7 @@ def calculate_reconstruction_errors(model, dataloader, device):
             
     return np.array(errors)
 
-def run_inference():
+def run_inference(return_metrics: bool = False):
     config = load_config()
     params = config['model_params']
     device = get_device()
@@ -138,6 +138,15 @@ def run_inference():
     auroc = roc_auc_score(y_true, y_scores)
     logging.info(f"Final AUROC Score: {auroc:.4f}")
 
+    metrics = {
+        "auroc_score": float(auroc),
+        "precision": float(precision),
+        "recall": float(recall),
+        "f1_score": float(f1),
+        "calculated_threshold": float(threshold),
+        "threshold_percentile": int(best_percentile),
+    }
+
     # 7. Log to Cloud Database
     eval_experiment_name = "Voraus_Robotic_Anomaly_Detection_Eval"
     eval_run_name = get_next_versioned_run_name(
@@ -151,14 +160,11 @@ def run_inference():
         mlflow.log_param("model_type", model_type)
         # Now logs the actual winning percentile
         mlflow.log_param("threshold_percentile", best_percentile) 
-        mlflow.log_metrics({
-            "auroc_score": auroc,
-            "precision": precision,
-            "recall": recall,
-            "f1_score": f1,
-            "calculated_threshold": threshold
-        })
+        mlflow.log_metrics(metrics)
         mlflow.log_artifact(str(threshold_path), artifact_path="threshold")
+
+    if return_metrics:
+        return metrics
 
 if __name__ == "__main__":
     run_inference()
