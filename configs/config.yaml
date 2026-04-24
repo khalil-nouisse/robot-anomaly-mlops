@@ -1,27 +1,16 @@
 data:
-  raw_path: "data/voraus-ad-dataset-100hz.parquet"
-  processed_dir: "data/processed"
-
+  raw_path: data/voraus-ad-dataset-100hz.parquet
+  processed_dir: data/processed
 model:
-  models_dir: "models"
+  models_dir: models
   fixed_length: 250
-
 model_params:
-  model_type: "GRU"
-  n_features: 130   # 137 total - 7 ignored = 130
-  hidden_dim: 32    # How much we compress the data (the bottleneck)
-  n_layers: 1       # Number of LSTM layers
-  dropout: 0.1
-  learning_rate: 0.0003
+  model_type: GRU
+  n_features: 130
+  hidden_dim: 32
+  n_layers: 1
+  dropout: 0.25
+  learning_rate: 0.0007983336118355257
   batch_size: 32
-  epochs: 150
-  threshold : 1.53305 
-
-
-
-# tunning parameters : 
-# hidden_dim: [64 , 32 , 16]
-# dropout: [0.2 , 0.3  , 0.4]
-# epochs : [50 , 100 , 150]
-
-#drop treshhold percentil  [95 , 90 , 85 ]
+  epochs: 80
+  threshold: 1.53305

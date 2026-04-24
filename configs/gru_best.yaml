@@ -9,12 +9,12 @@ model:
 model_params:
   model_type: "GRU"
   n_features: 130   # 137 total - 7 ignored = 130
-  hidden_dim: 32    # How much we compress the data (the bottleneck)
+  hidden_dim: 24    # How much we compress the data (the bottleneck)
   n_layers: 1       # Number of LSTM layers
-  dropout: 0.1
-  learning_rate: 0.0005
+  dropout: 0.2
+  learning_rate: 0.001
   batch_size: 32
-  epochs: 170
+  epochs: 120
   threshold : 1.53305 
 
 
